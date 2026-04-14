@@ -2,6 +2,7 @@ from fastapi import APIRouter, Header, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app import models
+from app.auth import get_current_user
 
 router = APIRouter()
 
@@ -36,3 +37,14 @@ def detect(input_data: str, x_api_key: str = Header(...), db: Session = Depends(
         "result": result,
         "confidence": confidence
     }
+
+@router.get("/history")
+def get_history(
+    user_id: int = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    scans = db.query(models.Scan).filter(models.Scan.user_id == user_id)\
+        .order_by(models.Scan.created_at.desc()).all()
+
+    return scans

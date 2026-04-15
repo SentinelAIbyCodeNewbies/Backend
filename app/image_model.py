@@ -21,7 +21,7 @@ def predict_image_from_url(url: str):
         if "image" not in content_type:
             return {"error": f"URL is not an image (Content-Type: {content_type})"}
         
-        
+
         img = Image.open(BytesIO(response.content)).convert("RGB")
 
         img = img.resize((224, 224))
@@ -30,6 +30,7 @@ def predict_image_from_url(url: str):
         img_array = preprocess_input(img_array)
 
         prediction_score = model.predict(img_array)[0][0]
+        
 
         if prediction_score >= 0.5:
             label = "Real"
@@ -38,9 +39,13 @@ def predict_image_from_url(url: str):
             label = "Fake"
             confidence = float((1.0 - prediction_score) * 100)
 
+        print(f"Raw score: {prediction_score}")
+        raw = float(prediction_score)
+
         return {
             "label": label,
-            "confidence": round(confidence, 2)
+            "confidence": round(confidence, 2),
+            "raw": raw
         }
 
     except Exception as e:

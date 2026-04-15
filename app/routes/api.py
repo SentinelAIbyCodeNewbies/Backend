@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app import models
 from app.auth import get_current_user
+from app.schemas import AnalyseRequest
 
 router = APIRouter()
 
@@ -13,16 +14,37 @@ def get_db():
     finally:
         db.close()
 
-@router.post("/detect")
-def detect(input_data: str, x_api_key: str = Header(...), db: Session = Depends(get_db)):
+@router.post("/analyse")
+def analyse(
+    request: AnalyseRequest,
+    x_api_key: str = Header(...),
+    db: Session = Depends(get_db)
+):
 
     key = db.query(models.APIKey).filter(models.APIKey.key == x_api_key).first()
 
     if not key:
         raise HTTPException(status_code=401, detail="Invalid API key")
 
-    result = "fake"   #later replace with ai model
-    confidence = "0.87"
+    input_type = request.type
+    input_data = request.input
+
+    if input_type == "image":
+        result = "fake"
+        confidence = "0.91"
+    elif input_type == "video":
+        result = "real"
+        confidence = "0.76"
+
+    elif input_type == "audio":
+        result = "fake"
+        confidence = "0.82"
+
+    elif input_type == "url":
+        result = "fake"
+        confidence = "0.88"
+    else:
+        raise HTTPException(status_code=400, detail="Invalid Type")
 
     scan = models.Scan(
         user_id=key.user_id,
@@ -34,6 +56,7 @@ def detect(input_data: str, x_api_key: str = Header(...), db: Session = Depends(
     db.commit()
 
     return {
+        "type": input_type,
         "result": result,
         "confidence": confidence
     }

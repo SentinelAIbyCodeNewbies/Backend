@@ -4,6 +4,9 @@ from app.db import SessionLocal
 from app import models
 from app.auth import get_current_user
 from app.schemas import AnalyseRequest
+from app.services.video_detector import predict_video
+from app.services.downloader import download_file
+import os
 
 router = APIRouter()
 
@@ -32,9 +35,21 @@ def analyse(
     if input_type == "image":
         result = "fake"
         confidence = "0.91"
+        
     elif input_type == "video":
-        result = "real"
-        confidence = "0.76"
+        try:
+            temp_path = download_file(input_data)
+            
+            prediction = predict_video(temp_path)
+
+            result = prediction["prediction"]
+            confidence = str(prediction["confidence"])
+
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=str(e))
 
     elif input_type == "audio":
         result = "fake"

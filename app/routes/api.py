@@ -93,6 +93,31 @@ async def analyse_upload(
         with open(temp_path, "wb") as f:
             f.write(await file.read())
 
+        prediction = predict_video(temp_path)
+
+        result = prediction["prediction"]
+        confidence = str(prediction["confidence"])
+
+        scan = models.Scan(
+            user_id = key.user_id,
+            input_data = file.filename,
+            result = result,
+            confidence = confidence
+        )
+        db.add(scan)
+        db.commit()
+
+        if os.path.exists(temp_path):
+            os.remove(temp_path)
+
+        return{
+            "type": "video",
+            "result": result,
+            "confidence": confidence
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/history")
 def get_history(
     user_id: int = Depends(get_current_user),

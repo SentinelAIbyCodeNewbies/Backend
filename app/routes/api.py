@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Header, Depends, HTTPException
+from fastapi import APIRouter, Header, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
 from app import models
@@ -35,10 +35,10 @@ def analyse(
     if input_type == "image":
         result = "fake"
         confidence = "0.91"
-        
+
     elif input_type == "video":
         try:
-            temp_path = download_file(input_data)
+            temp_path = "test.mp4"
             
             prediction = predict_video(temp_path)
 
@@ -75,6 +75,23 @@ def analyse(
         "result": result,
         "confidence": confidence
     }
+
+@router.post("/analyse_upload")
+async def analyse_upload(
+    file: UploadFile = File(...),
+    x_api_key: str = Header(...),
+    db: Session = Depends(get_db)
+):
+    key = db.query(models.APIKey).filter(models.APIKey.key == x_api_key).first()
+
+    if not key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    try:
+        temp_path = f"temp_{file.filename}"
+
+        with open(temp_path, "wb") as f:
+            f.write(await file.read())
 
 @router.get("/history")
 def get_history(

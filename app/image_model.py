@@ -12,7 +12,12 @@ model = load_model("models/xception_deepfake_base.keras")
 
 def predict_image_from_url(url: str):
     try:
-        response = requests.get(url)
+        headers = {
+            "User-Agent": "Mozilla/5.0",
+            "Accept": "image/webp,image/apng,image/*,*/*;q=0.8"
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
 
         if response.status_code != 200:
             return{"error": "Failed to download image"}
@@ -21,6 +26,7 @@ def predict_image_from_url(url: str):
         if "image" not in content_type:
             return {"error": f"URL is not an image (Content-Type: {content_type})"}
         
+        print("Status:", response.status_code)
 
         img = Image.open(BytesIO(response.content)).convert("RGB")
 

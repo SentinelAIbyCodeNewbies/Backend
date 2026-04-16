@@ -29,7 +29,14 @@ async def analyze_url(data: dict):
     }
 
 @app.post("/analyze_video")
-async def analyze_video():
-    return {"result": "video processed"}
+async def analyze_video(data: dict):
+    url = data.get("url")
+
+    result = predict_image_from_url(url)
+
+    return {
+        "input_url": url,
+        "prediction": result 
+    }
 
 

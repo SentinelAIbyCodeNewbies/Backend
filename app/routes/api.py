@@ -23,49 +23,6 @@ def get_db():
     finally:
         db.close()
 
-
-@router.post("/analyse/video-url")
-def analyse_video_url(
-    request: AnalyseRequest,
-    x_api_key: str = Header(...),
-    db: Session = Depends(get_db)
-):
-    key = db.query(models.APIKey).filter(models.APIKey.key == x_api_key).first()
-
-    if not key:
-        raise HTTPException(status_code=401, detail="Invalid API Key")
-    
-    try:
-        temp_path = download_file(request.input)
-
-        prediction = predict_video(temp_path)
-
-        result = prediction["prediction"]
-        confidence = str(prediction["confidence"])
-
-        if "error" in prediction:
-            raise HTTPException(status_code=400, detail= prediction["error"])
-
-        scan = models.Scan(
-            user_id=key.user_id,
-            input_data=request.input,
-            result=result,
-            confidence=confidence
-        )
-        db.add(scan)
-        db.commit()
-
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
-
-        return{
-            "type": "video-url",
-            "result": result,
-            "confidence": confidence
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
     
 @router.post("/analyse/url")
 def analyse_url(

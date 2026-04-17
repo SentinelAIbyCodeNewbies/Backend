@@ -206,44 +206,6 @@ async def analyse_upload(
             os.remove(temp_path)
 
 
-@router.post("/analyse/image-url")
-def analyse_image_url(
-    request: AnalyseRequest,
-    x_api_key: str = Header(...),
-    db: Session = Depends(get_db)
-):
-    key = db.query(models.APIKey).filter(models.APIKey.key == x_api_key).first()
-
-    if not key:
-        raise HTTPException(status_code=401, detail="Invalid API key")
-
-    try:
-        prediction = predict_image_from_url(request.input)
-
-        if "error" in prediction:
-            raise HTTPException(status_code=400, detail=prediction["error"])
-
-        result = prediction["label"].lower()
-        confidence = str(prediction["confidence"])
-
-        scan = models.Scan(
-            user_id=key.user_id,
-            input_data=request.input,
-            result=result,
-            confidence=confidence
-        )
-        db.add(scan)
-        db.commit()
-
-        return {
-            "type": "image-url",
-            "result": result,
-            "confidence": confidence,
-            "raw_score": prediction["raw_score"]
-        }
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/history")
 def get_history(

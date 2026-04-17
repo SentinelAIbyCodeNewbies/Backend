@@ -26,6 +26,7 @@ class Scan(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id=Column(Integer, ForeignKey("users.id"))
     input_data = Column(String)
+    media_type = Column(String)
     result = Column(String)
     confidence = Column(String)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

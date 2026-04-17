@@ -1,6 +1,7 @@
 import os
 import uuid
 import shutil
+import requests
 from fastapi import APIRouter, Header, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
@@ -9,7 +10,7 @@ from app.auth import get_current_user
 from app.schemas import AnalyseRequest
 from app.services.video_detector import predict_video
 from app.services.downloader import download_file
-from app.image_model import predict_image_from_url
+from app.image_model import predict_image_from_url, predict_image_from_file
 
 
 router = APIRouter()
@@ -65,7 +66,7 @@ def analyse_video_url(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-
+@
 
 @router.post("/analyse/analyse_upload")
 async def analyse_upload(
@@ -78,18 +79,31 @@ async def analyse_upload(
     if not key:
         raise HTTPException(status_code=401, detail="Invalid API key")
     
-    temp_path = f"temp_{uuid.uuid4()}.mp4"
+    file_ext = ".mp4" if file.content_type.startswith("video") else ".jpg"
+
+    temp_path = f"temp_{uuid.uuid4()}{file_ext}"
     
     try:
         with open(temp_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        prediction =  predict_video(temp_path)
+        if file.content_type.startswith("video/"):
+            prediction = predict_video(temp_path)
+            media_type = "video"
+            if "error" in prediction:
+                raise HTTPException(status_code=400, detail=prediction["error"])
+            result = prediction["prediction"].lower()
 
-        if "error" in prediction:
-            raise HTTPException(status_code=400, detail=prediction["error"])
+        elif file.content_type.startswith("image/"):
+            prediction = predict_image_from_file(temp_path)
+            media_type = "image"
+            if "error" in prediction:
+                raise HTTPException(status_code=400, detail=prediction["error"])
+            result = prediction["label"].lower()
 
-        result = prediction["prediction"]
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported file type. Please upload an image or video.")
+        
         confidence = str(prediction["confidence"])
 
         scan = models.Scan(
@@ -100,9 +114,6 @@ async def analyse_upload(
         )
         db.add(scan)
         db.commit()
-
-        if os.path.exists(temp_path):
-            os.remove(temp_path)
 
         return{
             "type": "video",
@@ -126,19 +137,14 @@ def analyse_image_url(
 
     if not key:
         raise HTTPException(status_code=401, detail="Invalid API key")
-    
-    temp_path = f"temp_{uuid.uuid4()}.mp4"
 
     try:
-        with open(temp_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-
-        prediction = predict_video(temp_path)
+        prediction = predict_image_from_url(request.input)
 
         if "error" in prediction:
             raise HTTPException(status_code=400, detail=prediction["error"])
-        
-        result = prediction["prediction"]
+
+        result = prediction["label"].lower()
         confidence = str(prediction["confidence"])
 
         scan = models.Scan(
@@ -154,7 +160,7 @@ def analyse_image_url(
             "type": "image-url",
             "result": result,
             "confidence": confidence,
-            "raw_score": prediction["raw_score"]  
+            "raw_score": prediction["raw_score"]
         }
 
     except Exception as e:
@@ -162,11 +168,15 @@ def analyse_image_url(
 
 @router.get("/history")
 def get_history(
+    media_type: Optional[str] = None,
     user_id: int = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
+    query = db.query(models.Scan).filter(models.Scan.user_id == user_id)
 
-    scans = db.query(models.Scan).filter(models.Scan.user_id == user_id)\
-        .order_by(models.Scan.created_at.desc()).all()
+    if media_type:
+        query = query.filter(models.Scan.media_type == media_type.lower())
+
+    scans = query.order_by(models.Scan.created_at.desc()).all()
 
     return scans

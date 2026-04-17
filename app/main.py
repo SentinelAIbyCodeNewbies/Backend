@@ -2,7 +2,6 @@ from fastapi import FastAPI
 from app.db import Base, engine
 from app import models
 from app.routes import auth, api
-from app.image_model import predict_image_from_url
 
 
 app = FastAPI()

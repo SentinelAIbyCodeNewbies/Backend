@@ -60,3 +60,29 @@ def predict_image_from_url(url: str):
         return {
             "error": str(e)
         }
+    
+def predict_image_from_file(file_path: str):
+    try:
+        img = Image.open(file_path).convert("RGB")
+
+        img = img.resize((224,224))
+        img_array = np.array(img)
+        img_array = np.expand_dims(img_array, axis=0)
+        img_array = preprocess_input(img_array)
+
+        prediction_score = float(model.predict(img_array)[0][0])
+
+        if prediction_score >= 0.5:
+            label = "Real"
+            confidence = float(prediction_score*100)
+        else:
+            label= "Fake"
+            confidence = float((1.0 - prediction_score) *100)
+
+        return{
+            "label": label,
+            "confidence": round(float(confidence), 2),
+            "raw_score": round(float(prediction_score),4)
+        }
+    except Exception as e:
+        return {"error": str(e)}

@@ -66,7 +66,80 @@ def analyse_video_url(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
-@
+@router.post("/analyse/url")
+def analyse_url(
+    request: AnalyseRequest,
+    x_api_key: str = Header(...),
+    db: Session = Depends(get_db)
+):
+    key = db.query(models.APIKey).filter(models.APIKey.key == x_api_key).first()
+    if not key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    
+    target_url = request.input
+    media_type = request.type
+
+    if "instagram.com" in target_url:
+        n8n_webhook = "http://localhost:5678/webhook-test/8b86b827-299b-4004-9242-4381cbcc3043"
+        try:
+            n8n_response = requests.post(n8n_webhook, json={"url": target_url})
+            if n8n_response.status_code != 200:
+                raise HTTPException(status_code=400, detail="n8n failed to process instagram url")
+            
+            n8n_data = n8n_response.json()
+            target_url = n8n_data.get("raw_url")
+
+            if not target_url:
+                raise HTTPException(status_code=400, detail="Could not extract media url from n8n response")
+            
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"n8n Webhook Error: {str(e)}")
+        
+    try:
+        if media_type == "image":
+            prediction = predict_image_from_url(target_url)
+            if "error" in prediction:
+                raise HTTPException(status_code=400, detail=prediction["error"])
+            
+            result = prediction["label"].lower()
+            confidence = str(prediction["confidence"])
+
+
+        elif media_type == "video":
+            temp_path = download_file(target_url)
+            prediction = predict_video(temp_path)
+
+            if "error" in prediction:
+                raise HTTPException(status_code=400, detail=prediction["error"])
+                
+            result = prediction["prediction"].lower()
+            confidence = str(prediction["confidence"])
+            
+            if os.path.exists(temp_path):
+                os.remove(temp_path)
+
+        else:
+            raise HTTPException(status_code=400, detail="Invalid media type specified. Use 'image' or 'video'. ")
+        
+        scan = models.Scan(
+            user_id = key.user_id,
+            input_data = request.input,
+            media_type=media_type,
+            result=result,
+            confidence=confidence
+        )
+        db.add(scan)
+        db.commit()
+
+        return{
+            "type": media_type,
+            "original_url": request.input,
+            "result": result,
+            "confidence": confidence
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
 
 @router.post("/analyse/analyse_upload")
 async def analyse_upload(

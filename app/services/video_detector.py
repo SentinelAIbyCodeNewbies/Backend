@@ -43,18 +43,14 @@ def predict_video(video_path):
         return {"error": "No frames extracted"}
     
     preds = model.predict(frames)
-    
-    # Convert numpy float to native Python float
+   
     avg_pred = float(preds.mean())
 
-    # Flipped logic: Closer to 1 is Real, Closer to 0 is Fake
     if avg_pred >= 0.5:
         label = "real"
-        # If it's 0.85, it's 85% confident it's real
         confidence_pct = avg_pred * 100 
     else:
         label = "fake"
-        # If it's 0.15, it's 85% confident it's fake (1.0 - 0.15)
         confidence_pct = (1.0 - avg_pred) * 100
 
     return {

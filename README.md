@@ -29,16 +29,40 @@ Backend service for a **Deepfake Detection Platform** that allows users to analy
 ## 📁 Project Structure
 
 ```
-app/
- ├── main.py          # Entry point
- ├── db.py            # Database connection
- ├── models.py        # SQLAlchemy models
- ├── schemas.py       # Request/response schemas
- ├── auth.py          # JWT + auth utilities
- ├── utils.py         # Helper functions
- ├── routes/
- │    ├── auth.py     # Auth endpoints
- │    ├── api.py      # Core API endpoints
+.
+├── app/
+│   ├── __pycache__/                # Compiled Python files
+│   │
+│   ├── routes/                    # API route definitions
+│   │   ├── __pycache__/
+│   │   ├── api.py                 # Core analysis endpoints (image/video)
+│   │   └── auth.py                # Authentication routes (login/register)
+│   │
+│   ├── services/                  # Business logic layer
+│   │   ├── __pycache__/
+│   │   ├── downloader.py          # Handles media downloading from URLs
+│   │   └── video_detector.py      # Video deepfake detection logic
+│   │
+│   ├── video_detect/              # Video model & related assets
+│   │   ├── best_tf_model.keras    # Trained TensorFlow model for video detection
+│   │   └── model.ipynb            # Notebook used for training/testing model
+│   │
+│   ├── auth.py                    # JWT token handling & auth utilities
+│   ├── db.py                      # Database configuration & session setup
+│   ├── image_model.py             # Image deepfake detection model logic
+│   ├── main.py                    # FastAPI application entry point
+│   ├── models.py                  # SQLAlchemy ORM models
+│   ├── schemas.py                 # Pydantic schemas for request/response
+│   └── utils.py                   # Utility functions (hashing, API keys, etc.)
+│
+├── models/                       # Stored ML models (image model files, etc.)
+|   |---xception_deepfake_base.keras  #image detection model
+│
+├── venv/                          # Virtual environment (should not be committed)
+├── .env                           # Environment variables (API keys, secrets)
+├── .gitignore                     # Git ignore rules
+├── LICENSE                        # License file
+└── README.md                      # Project documentation
 ```
 
 ---

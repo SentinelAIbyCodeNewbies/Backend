@@ -10,9 +10,7 @@ from typing import Optional
 from app.auth import get_current_user
 from app.schemas import AnalyseRequest
 from app.services.video_detector import predict_video
-from app.services.downloader import download_file
 from app.image_model import predict_image_from_url, predict_image_from_file
-from app.services.ytdlp_service import download_media_ytdlp
 from app.services.ytdlp_service import download_media_ytdlp
 from app.services.image_scraper import get_raw_image_url
 

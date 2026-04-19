@@ -12,6 +12,7 @@ from app.schemas import AnalyseRequest
 from app.services.video_detector import predict_video
 from app.services.downloader import download_file
 from app.image_model import predict_image_from_url, predict_image_from_file
+from app.services.ytdlp_service import download_media_ytdlp
 
 
 router = APIRouter()
@@ -33,49 +34,33 @@ def analyse_url(
     target_url = request.input
     media_type = request.type
 
-    if "instagram.com" in target_url:
-        n8n_webhook = "http://localhost:5678/webhook/8b86b827-299b-4004-9242-4381cbcc3043" 
-        
-        n8n_response = requests.post(n8n_webhook, json={"url": target_url})
-        
-        if n8n_response.status_code != 200:
-            print(f"N8N ERROR: {n8n_response.status_code} - {n8n_response.text}")
-            raise HTTPException(status_code=400, detail=f"n8n failed: {n8n_response.text}")
-        
-        try:
-            n8n_data = n8n_response.json()
-            target_url = n8n_data.get("raw_url")
-            
-            if not target_url:
-                raise HTTPException(status_code=400, detail="n8n succeeded but didn't return a 'raw_url'")
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to parse n8n response: {str(e)}")
-
     try:
-        if media_type == "image":
-            prediction = predict_image_from_url(target_url)
-            if "error" in prediction:
-                raise HTTPException(status_code=400, detail=prediction["error"])
-            
-            result = prediction["label"].lower()
-            confidence = str(prediction["confidence"])
+        if media_type == "video":
+            temp_path = download_media_ytdlp(target_url)
 
-        elif media_type == "video":
-            temp_path = download_file(target_url)
             prediction = predict_video(temp_path)
 
             if "error" in prediction:
                 raise HTTPException(status_code=400, detail=prediction["error"])
-                
+            
             result = prediction["prediction"].lower()
             confidence = str(prediction["confidence"])
-            
+
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
-        else:
-            raise HTTPException(status_code=400, detail="Invalid media type specified. Use 'image' or 'video'. ")
+        elif media_type == "image":
+            prediction = predict_image_from_url(target_url)
+
+            if "error" in prediction:
+                raise HTTPException(status_code=400, detail=prediction["error"])
        
+            result = prediction["label"].lower()
+            confidence = str(prediction["confidence"])
+
+        else:
+            raise HTTPException(status_code=400, detail="Invalid media type specified.")
+        
         scan = models.Scan(
             user_id = user_id,  
             input_data = request.input,
@@ -94,6 +79,8 @@ def analyse_url(
             "raw_score": prediction.get("raw_score")
         }
     except Exception as e:
+        if 'temp_path' in locals() and os.path.exists(temp_path):
+            os.remove(temp_path)
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/analyse/analyse_upload")

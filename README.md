@@ -1,3 +1,6 @@
+
+---
+
 # 🚀 Sentinel AI – Backend
 
 Backend service for a **Deepfake Detection Platform** that allows users to analyze images/videos and determine whether they are AI-generated or real.
@@ -31,43 +34,43 @@ Backend service for a **Deepfake Detection Platform** that allows users to analy
 ```
 .
 ├── app/
-│   ├── __pycache__/                # Compiled Python files
+│   ├── __pycache__/                
 │   │
-│   ├── routes/                    # API route definitions
+│   ├── routes/                    
 │   │   ├── __pycache__/
-│   │   ├── api.py                 # Core analysis endpoints (image/video)
-│   │   └── auth.py                # Authentication routes (login/register)
+│   │   ├── api.py                 
+│   │   └── auth.py                
 │   │
-│   ├── services/                  # Business logic layer
+│   ├── services/                  
 │   │   ├── __pycache__/
-│   │   ├── downloader.py          # Handles media downloading from URLs
-│   │   └── video_detector.py      # Video deepfake detection logic
+│   │   ├── downloader.py          
+│   │   └── video_detector.py      
 │   │
-│   ├── video_detect/              # Video model & related assets
-│   │   ├── best_tf_model.keras    # Trained TensorFlow model for video detection
-│   │   └── model.ipynb            # Notebook used for training/testing model
+│   ├── video_detect/              
+│   │   ├── best_tf_model.keras    
+│   │   └── model.ipynb            
 │   │
-│   ├── auth.py                    # JWT token handling & auth utilities
-│   ├── db.py                      # Database configuration & session setup
-│   ├── image_model.py             # Image deepfake detection model logic
-│   ├── main.py                    # FastAPI application entry point
-│   ├── models.py                  # SQLAlchemy ORM models
-│   ├── schemas.py                 # Pydantic schemas for request/response
-│   └── utils.py                   # Utility functions (hashing, API keys, etc.)
+│   ├── auth.py                    
+│   ├── db.py                      
+│   ├── image_model.py             
+│   ├── main.py                    
+│   ├── models.py                  
+│   ├── schemas.py                 
+│   └── utils.py                   
 │
-├── models/                       # Stored ML models (image model files, etc.)
-|   |---xception_deepfake_base.keras  #image detection model
+├── models/                       
+│   └── xception_deepfake_base.keras  
 │
-├── venv/                          # Virtual environment (should not be committed)
-├── .env                           # Environment variables (API keys, secrets)
-├── .gitignore                     # Git ignore rules
-├── LICENSE                        # License file
-└── README.md                      # Project documentation
+├── venv/                          
+├── .env                           
+├── .gitignore                     
+├── LICENSE                        
+└── README.md                      
 ```
 
 ---
 
-## ⚙️ Setup Instructions
+## ⚙️ Setup Instructions (Manual)
 
 ### 1️⃣ Clone the repository
 
@@ -97,13 +100,13 @@ pip install fastapi uvicorn sqlalchemy psycopg2-binary passlib[bcrypt] python-jo
 
 ### 4️⃣ Configure environment variables
 
-Create a `.env` file in the root directory:
+Create a `.env` file:
 
 ```
 DATABASE_URL=postgresql://username:password@host:port/database
 ```
 
-> ⚠️ Use Supabase **Session Pooler (IPv4 compatible)** if direct connection fails.
+> ⚠️ Use Supabase Session Pooler if needed.
 
 ---
 
@@ -117,7 +120,83 @@ uvicorn app.main:app --reload
 
 ### 6️⃣ Open API Docs
 
-👉 http://127.0.0.1:8000/docs
+👉 [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)
+
+---
+
+# 🐳 Docker Setup (Recommended for Frontend Team)
+
+Run the backend **without installing Python or dependencies**.
+
+---
+
+## ✅ Prerequisites
+
+Install:
+
+* Docker Desktop
+
+---
+
+## 🚀 Steps to Run
+
+### 1️⃣ Clone the repository
+
+```
+git clone <your-repo-url>
+cd deepfake-backend
+```
+
+---
+
+### 2️⃣ Create `.env` file
+
+```
+DATABASE_URL=postgresql://username:password@host:port/database
+```
+
+---
+
+### 3️⃣ Start backend
+
+```
+docker compose up --build
+```
+
+---
+
+### 4️⃣ Access API
+
+* Backend:
+  👉 [http://localhost:8080](http://localhost:8080)
+
+* Swagger Docs:
+  👉 [http://localhost:8080/docs](http://localhost:8080/docs)
+
+---
+
+## 🛑 Stop the server
+
+```
+docker compose down
+```
+
+---
+
+## 🔄 Rebuild after changes
+
+```
+docker compose up --build
+```
+
+---
+
+## ⚠️ Notes for Frontend Team
+
+* No need to install Python
+* Make sure port **8080** is free
+* `.env` file is required
+* First run may take time (Docker build)
 
 ---
 
@@ -148,25 +227,24 @@ x-api-key: YOUR_API_KEY
 
 ### Auth
 
-* `POST /auth/register` → Register new user
-* `POST /auth/login` → Login user
-* `POST /auth/regenerate-key` → Generate new API key
+* `POST /auth/register`
+* `POST /auth/login`
+* `POST /auth/regenerate-key`
 
 ---
 
 ### Core API
 
-* `POST /detect` → Detect deepfake
-* `GET /history` → Get scan history
+* `POST /detect`
+* `GET /history`
 
 ---
 
 ## 🧪 Example Request
 
-### Detect Deepfake
-
 ```
 POST /detect
+
 Headers:
   x-api-key: YOUR_API_KEY
 
@@ -180,19 +258,19 @@ Body:
 
 ## 🧠 Future Improvements
 
-* 🤖 Integrate ML model for real detection
+* 🤖 ML model improvements
 * ⏱️ Rate limiting (Redis)
-* 🌐 Chrome extension support
-* 📊 Dashboard for analytics
-* 🔐 Multiple API keys per user
+* 🌐 Chrome extension
+* 📊 Dashboard
+* 🔐 Multiple API keys
 
 ---
 
 ## 💀 Notes
 
-* Ensure passwords do not exceed bcrypt limit (72 chars)
-* Use URL-safe encoding for DB credentials
-* Use Session Pooler if facing network issues with Supabase
+* bcrypt limit: 72 chars
+* Use URL-safe DB credentials
+* Use Supabase Session Pooler if needed
 
 ---
 
@@ -204,6 +282,6 @@ Built as part of a hackathon project – **Sentinel AI**
 
 ## ⭐ Contribute
 
-Pull requests are welcome. For major changes, please open an issue first.
+Pull requests are welcome. Open an issue for major changes.
 
 ---

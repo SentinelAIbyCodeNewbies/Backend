@@ -53,11 +53,9 @@ def get_current_user(
     x_api_key: Optional[str] = Security(api_key_scheme),
     db: Session = Depends(get_db)
 ) -> int:
-    # Try JWT first
     if credentials and credentials.credentials:
         return verify_jwt_and_get_user_id(credentials.credentials)
-
-    # Fall back to API key
+    
     if x_api_key:
         api_key = db.query(models.APIKey).filter(
             models.APIKey.key == x_api_key

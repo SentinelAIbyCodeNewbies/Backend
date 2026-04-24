@@ -43,9 +43,17 @@ def finalize_scan_response(db: Session, user_id: int, input_data: str, media_typ
         "type": media_type,
         "result": result,
         "confidence": confidence,
-        "raw_score": prediction.get("raw_score")
+        "raw_score": prediction.get("raw_score"),
+        "low_confidence": prediction.get("low_confidence", False),
     }
-    
+
+    # Video-specific diagnostics — useful for debugging and frontend UI
+    if media_type == "video":
+        response["frames_analysed"] = prediction.get("frames_analysed")
+        response["fake_frame_ratio"] = prediction.get("fake_frame_ratio")
+        response["fake_probability"] = prediction.get("fake_probability")
+        response["real_probability"] = prediction.get("real_probability")
+
     if is_url:
         response["original_url"] = input_data
 

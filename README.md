@@ -1,7 +1,3 @@
-Here’s your **fully updated, clean, Docker-first README** with the new endpoints + dual authentication included. You can copy-paste this directly to GitHub:
-
----
-
 # 🚀 Sentinel AI – Backend
 
 Backend service for a **Deepfake Detection Platform** that allows users to analyze images/videos and determine whether they are AI-generated or real.

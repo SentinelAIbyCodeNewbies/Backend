@@ -34,38 +34,46 @@ Backend service for a **Deepfake Detection Platform** that allows users to analy
 ```
 .
 ├── app/
-│   ├── __pycache__/                
+│   ├── __pycache__/
 │   │
-│   ├── routes/                    
+│   ├── detectors/
+│   │   ├── image_model.py
+│   │   └── video_detector.py
+│   │
+│   ├── models/
+│   │   ├── image_detect/
+│   │   │   └── xception_deepfake_base.keras
+│   │   └── video-detect/
+│   │       ├── model.ipynb
+│   │       └── video_model.keras
+│   │
+│   ├── routes/
 │   │   ├── __pycache__/
-│   │   ├── api.py                 
-│   │   └── auth.py                
+│   │   ├── api.py
+│   │   └── auth.py
 │   │
-│   ├── services/                  
+│   ├── services/
 │   │   ├── __pycache__/
-│   │   ├── downloader.py          
-│   │   └── video_detector.py      
+│   │   ├── image_scraper.py
+│   │   └── ytdlp_service.py
 │   │
-│   ├── video_detect/              
-│   │   ├── best_tf_model.keras    
-│   │   └── model.ipynb            
-│   │
-│   ├── auth.py                    
-│   ├── db.py                      
-│   ├── image_model.py             
-│   ├── main.py                    
-│   ├── models.py                  
-│   ├── schemas.py                 
-│   └── utils.py                   
+│   ├── auth.py
+│   ├── db.py
+│   ├── image_model.py
+│   ├── main.py
+│   ├── models.py
+│   ├── schemas.py
+│   └── utils.py
 │
-├── models/                       
-│   └── xception_deepfake_base.keras  
+├── models/
+│   └── xception_deepfake_base.keras
 │
-├── venv/                          
-├── .env                           
-├── .gitignore                     
-├── LICENSE                        
-└── README.md                      
+├── venv/
+├── .env
+├── .gitignore
+├── cookies.txt
+├── LICENSE
+└── README.md                  
 ```
 
 ---

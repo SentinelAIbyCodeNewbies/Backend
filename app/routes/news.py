@@ -170,8 +170,9 @@ def run_pipeline(headline: str) -> FactCheckResponse:
 
     except HTTPException:
       raise
-    except Exception as exc:  # full output, no truncation
-      raise HTTPException(status_code=502, detail=f"Model output was not valid JSON: {exc}")
+    except Exception:
+       latency_ms = int((time.monotonic() - t0) * 1000)
+       return degraded_response(latency_ms)
 
     raw_sources = result.get("sources", [])
     filtered_sources, trusted_count = _filter_sources(raw_sources)

@@ -105,6 +105,26 @@ def _extract_json(raw: str) -> dict:
 
   raise ValueError("No complete JSON object found in response")
 
+def _call_gemini_with_retry(client, headline, retries=3):
+    for attempt in range(retries):
+        try:
+            return client.models.generate_content(
+                model=MODEL,
+                contents=f'Fact-check this headline: "{headline}"',
+                config=types.GenerateContentConfig(
+                    system_instruction=SYSTEM_PROMPT,
+                    temperature=0.1,
+                    max_output_tokens=8192,
+                    tools=[types.Tool(google_search=types.GoogleSearch())],
+                ),
+            )
+        except Exception as exc:
+            if "503" in str(exc) or "UNAVAILABLE" in str(exc):
+                time.sleep(2 ** attempt)
+                continue
+            raise
+    raise HTTPException(status_code=502, detail="Gemini overloaded after retries")
+
 
 def run_pipeline(headline: str) -> FactCheckResponse:
     t0 = time.monotonic()

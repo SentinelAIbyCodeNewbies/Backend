@@ -129,21 +129,30 @@ def _call_gemini_with_retry(client, headline, retries=3):
 def run_pipeline(headline: str) -> FactCheckResponse:
     t0 = time.monotonic()
 
+    def degraded_response(latency_ms: int) -> FactCheckResponse:
+       return FactCheckResponse(
+          verdict="Unverified",
+          summary="Fact-check service temporarily unavailable due to high load.",
+          nuance=None, 
+          sources=[],
+          metadata=PipelineMetadata(
+             search_query="",
+             entities=[],
+             confidence="Low",
+             sources_found=0,
+             trusted_sources_used=0,
+             latency_ms=latency_ms,
+             model=MODEL,
+          )
+       )
+
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     try:
-        response = client.models.generate_content(
-            model=MODEL,
-            contents=f'Fact-check this headline: "{headline}"',
-            config=types.GenerateContentConfig(
-                system_instruction=SYSTEM_PROMPT,
-                temperature=0.1,
-                max_output_tokens=8192,
-                tools=[types.Tool(google_search=types.GoogleSearch())],
-            ),
-        )
+        response = _call_gemini_with_retry(client, headline)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Upstream API error: {exc}")
+        latency_ms = int((time.monotonic() -t0) * 1000)
+        return degraded_response(latency_ms)
 
     raw_text = ""
     try:

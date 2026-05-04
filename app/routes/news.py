@@ -1,4 +1,5 @@
 import json
+import logging                         
 import time
 import re
 from google import genai
@@ -9,6 +10,7 @@ from app.config import MODEL, BLOCKED_DOMAINS, TRUSTED_DOMAINS, GEMINI_API_KEY
 from app.schemas import FactCheckResponse, SourceResult, PipelineMetadata, FactCheckRequest
 
 router = APIRouter()
+logger = logging.getLogger(__name__)    
 
 SYSTEM_PROMPT = """You are a fact-checking pipeline that verifies news headlines against reputable sources.
 
@@ -48,10 +50,14 @@ Rules:
 - OUTPUT ONLY THE JSON OBJECT. NOTHING ELSE.
 """
 
+def _normalize_domain(domain: str) -> str:
+    return domain.strip().lower().removeprefix("www.")
+
+
 def _filter_sources(sources: list[dict]) -> tuple[list[dict], int]:
     filtered = []
     for s in sources:
-        domain = s.get("domain", "").lower().lstrip("www.")
+        domain = _normalize_domain(s.get("domain", ""))
         if any(domain == bd or domain.endswith("." + bd) for bd in BLOCKED_DOMAINS):
             continue
         filtered.append(s)
@@ -59,58 +65,59 @@ def _filter_sources(sources: list[dict]) -> tuple[list[dict], int]:
     trusted_count = sum(
         1 for s in filtered
         if any(
-            s.get("domain", "").lower().lstrip("www.") == td
-            or s.get("domain", "").lower().lstrip("www.").endswith("." + td)
+            _normalize_domain(s.get("domain", "")) == td
+            or _normalize_domain(s.get("domain", "")).endswith("." + td)
             for td in TRUSTED_DOMAINS
         )
     )
     return filtered, trusted_count
 
+
 def _extract_json(raw: str) -> dict:
-  raw = raw.replace("{{", "{").replace("}}", "}")
+    raw = raw.replace("{{", "{").replace("}}", "}")
+    raw = raw.replace("\u201c", '"').replace("\u201d", '"')
+    raw = raw.replace("\u2018", "'").replace("\u2019", "'")
 
-  raw = raw.replace("\u201c", '"').replace("\u201d", '"')
-  raw = raw.replace("\u2018", "'").replace("\u2019", "'")
+    raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
+    raw = re.sub(r"\s*```$", "", raw.strip())
 
-  raw = re.sub(r"^```(?:json)?\s*", "", raw.strip())
-  raw = re.sub(r"\s*```$", "", raw.strip())
+    start = raw.find("{")
+    if start == -1:
+        raise ValueError("No JSON object found in response")
 
-  start = raw.find("{")
-  if start == -1:
-    raise ValueError("No JSON object found in response")
+    depth = 0
+    in_string = False
+    escape_next = False
 
-  depth = 0
-  in_string = False
-  escape_next = False
+    for i, ch in enumerate(raw[start:], start):
+        if escape_next:
+            escape_next = False
+            continue
+        if ch == "\\" and in_string:
+            escape_next = True
+            continue
+        if ch == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                candidate = raw[start:i + 1]
+                return json.loads(candidate)
 
-  for i, ch in enumerate(raw[start:], start):
-    if escape_next:
-      escape_next = False
-      continue
-    if ch == "\\" and in_string:
-      escape_next = True
-      continue
-    if ch == '"':
-      in_string = not in_string
-      continue
-    if in_string:
-      continue
-    if ch == "{":
-      depth += 1
-    elif ch == "}":
-      depth -= 1
-      if depth == 0:
-        candidate = raw[start:i + 1]
-        return json.loads(candidate)
+    raise ValueError("No complete JSON object found in response")
 
-  raise ValueError("No complete JSON object found in response")
 
-def _call_gemini_with_retry(client, headline, retries=3):
+def _call_gemini_with_retry(client, headline: str, retries: int = 3):
     for attempt in range(retries):
         try:
             return client.models.generate_content(
                 model=MODEL,
-                contents=f'Fact-check this headline: "{headline}"',
+                contents=f"Fact-check this headline: <headline>{headline}</headline>",
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_PROMPT,
                     temperature=0.1,
@@ -130,49 +137,62 @@ def run_pipeline(headline: str) -> FactCheckResponse:
     t0 = time.monotonic()
 
     def degraded_response(latency_ms: int) -> FactCheckResponse:
-       return FactCheckResponse(
-          verdict="Unverified",
-          summary="Fact-check service temporarily unavailable due to high load.",
-          nuance=None, 
-          sources=[],
-          metadata=PipelineMetadata(
-             search_query="",
-             entities=[],
-             confidence="Low",
-             sources_found=0,
-             trusted_sources_used=0,
-             latency_ms=latency_ms,
-             model=MODEL,
-          )
-       )
+        return FactCheckResponse(
+            verdict="Unverified",
+            summary="Fact-check service temporarily unavailable due to high load.",
+            nuance=None,
+            sources=[],
+            metadata=PipelineMetadata(
+                search_query="",
+                entities=[],
+                confidence="Low",
+                sources_found=0,
+                trusted_sources_used=0,
+                latency_ms=latency_ms,
+                model=MODEL,
+            ),
+        )
 
     client = genai.Client(api_key=GEMINI_API_KEY)
 
     try:
         response = _call_gemini_with_retry(client, headline)
+    except HTTPException:
+        raise
     except Exception as exc:
-        latency_ms = int((time.monotonic() -t0) * 1000)
+        logger.exception("Gemini call failed: %s", exc)
+        latency_ms = int((time.monotonic() - t0) * 1000)
         return degraded_response(latency_ms)
 
     raw_text = ""
     try:
-      candidate = response.candidates[0]
-      finish = candidate.finish_reason.name
+        candidate = response.candidates[0]
+        finish = candidate.finish_reason.name
 
-      if finish == "MAX_TOKENS":
-        raise HTTPException(status_code=502, detail="Model response was truncated. Try a shorter headline.")
+        if finish == "MAX_TOKENS":
+            raise HTTPException(
+                status_code=502,
+                detail="Model response was truncated. Try a shorter headline.",
+            )
 
-      if finish not in ("STOP",):
-        raise HTTPException(status_code=502, detail=f"Model stopped unexpectedly: {finish}")
+        if finish not in ("STOP",):
+            raise HTTPException(
+                status_code=502, detail=f"Model stopped unexpectedly: {finish}"
+            )
 
-      raw_text = response.text
-      result = _extract_json(raw_text)
+        raw_text = response.text
+        result = _extract_json(raw_text)
 
     except HTTPException:
-      raise
-    except Exception:
-       latency_ms = int((time.monotonic() - t0) * 1000)
-       return degraded_response(latency_ms)
+        raise
+    except Exception as exc:
+        logger.exception(
+            "Failed to parse Gemini response: %s | raw_text_preview=%r",
+            exc,
+            raw_text[:300],
+        )
+        latency_ms = int((time.monotonic() - t0) * 1000)
+        return degraded_response(latency_ms)
 
     raw_sources = result.get("sources", [])
     filtered_sources, trusted_count = _filter_sources(raw_sources)
@@ -202,9 +222,18 @@ def run_pipeline(headline: str) -> FactCheckResponse:
         ),
     )
 
+
 @router.post("/factcheck", response_model=FactCheckResponse)
 def factcheck(req: FactCheckRequest):
-  if not GEMINI_API_KEY:
-    raise HTTPException(status_code=500, detail="API key not configured.")
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="API key not configured.")
+    headline = req.headline.strip()
+    if not headline:
+        raise HTTPException(status_code=422, detail="Headline cannot be empty.")
+    if len(headline) > 500:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Headline too long ({len(headline)} chars). Maximum is 500.",
+        )
 
-  return run_pipeline(req.headline)
+    return run_pipeline(headline)
